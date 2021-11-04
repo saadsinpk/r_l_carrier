@@ -662,7 +662,7 @@ function sidtechno_sales_manager(){
 }
 
 function sid_show_sales_man() { 
-    if(!is_admin() AND is_user_logged_in()) {
+    if(!is_admin() AND is_user_logged_in() AND !wp_is_json_request()) {
         $user_id = get_current_user_id();
         $user = get_userdata( $user_id );
         $user_roles = $user->roles;
