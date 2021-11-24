@@ -1,4 +1,5 @@
 <?php 
+ini_set('display_errors', 1); ini_set('display_startup_errors', 1); error_reporting(E_ALL);
     $post_id = $_GET['order_id'];
     $wc_order = new WC_Order( $post_id );
     $order_items = $wc_order->get_items();
@@ -164,23 +165,38 @@
         $post_data['PickupRequest']['PickupInformation'] = $_POST['Pickup'];
         $post_data['PickupRequest']['Contact'] = $_POST['Contact'];
 
+        foreach ($post_data['BillOfLading']['NoSignatureNotificationContacts']['EmailAddresses'] as $key => $value) {
+            unset($post_data['BillOfLading']['NoSignatureNotificationContacts']['EmailAddresses'][$key]);
+        }
+        foreach ($post_data['BillOfLading']['NoSignatureNotificationContacts']['PhoneNumbers'] as $key => $value) {
+            unset($post_data['BillOfLading']['NoSignatureNotificationContacts']['PhoneNumbers'][$key]);
+        }
+        if(count($post_data['BillOfLading']['NoSignatureNotificationContacts']['EmailAddresses']) == 0) {
+            unset($post_data['BillOfLading']['NoSignatureNotificationContacts']['EmailAddresses']);
+        }
+        if(count($post_data['BillOfLading']['NoSignatureNotificationContacts']['PhoneNumbers']) == 0) {
+            unset($post_data['BillOfLading']['NoSignatureNotificationContacts']['PhoneNumbers']);
+        }
+        if(!isset($post_data['BillOfLading']['NoSignatureNotificationContacts']['PhoneNumbers']) AND !isset($post_data['BillOfLading']['NoSignatureNotificationContacts']['EmailAddresses'])) {
+            unset($post_data['BillOfLading']['NoSignatureNotificationContacts']);
+        }
         // $post_data['BillOfLading']['NoSignatureNotificationContacts'] = array('EmailAddresses'=> array('saad_sinpk@yahoo.com'), 'PhoneNumbers' => array('8472782321'));
-        if(in_array($post_data['BillOfLading']['AdditionalServices'], 'LimitedAccessPickup') || in_array($post_data['BillOfLading']['AdditionalServices'], 'LimitedAccessDelivery')) {
-            $post_data['BillOfLading']['NoSignatureDelivery'] = 1;
+        if(isset($post_data['BillOfLading']['AdditionalServices'])) {
+            if(in_array('LimitedAccessPickup', $post_data['BillOfLading']['AdditionalServices']) || in_array('LimitedAccessDelivery', $post_data['BillOfLading']['AdditionalServices'])) {
+                $post_data['BillOfLading']['NoSignatureDelivery'] = 1;
+            }
         }
             
             
 
-        $post_data['BillOfLading']['NoSignatureDelivery'] = 1;
-        echo "<pre>";
-            print_r($post_data);
-        echo "</pre>";
-
+        // $post_data['BillOfLading']['NoSignatureDelivery'] = 1;
+        // echo "<pre>";
+        //     print_r($post_data);
+        // echo "</pre>";
+        // exit();
         $post_data = json_encode($post_data);
         $response = sidtechno_curl_post('/BillOfLading', $post_data);
-        echo "<pre>";
-            print_r($response);
-        echo "</pre>";
+
         if(isset($response['status'])) {
             if($response['status'] == 'success') {
                 $response = json_decode($response['response']);
@@ -222,9 +238,15 @@
                 echo "<h3>Successfully BOLID generated</h3>";
             } else {
                 echo "<h4>Error!</h4>";
-                $error_list = json_decode($response['message']);
-                foreach ($error_list->Errors as $Errors_key => $Errors_value) {
-                    echo "<p><b>".$Errors_value->ErrorMessage."</b></p>";
+                if(isset($response['message'])) {
+                    if(isJson($response['message'])) {
+                        $error_list = json_decode($response['message']);
+                        foreach ($error_list->Errors as $Errors_key => $Errors_value) {
+                            echo "<p><b>".$Errors_value->ErrorMessage."</b><br>".$Errors_value->ExceptionMessage."</p>";
+                        }
+                    } else {
+                        echo $response['message'];
+                    }
                 }
             }
         }
@@ -235,23 +257,32 @@
         }
         $_POST['RateQuote']['Items'] = $item_rate_quote; 
         $_POST['RateQuote']['PickupDate'] = date("m/d/Y", strtotime($_POST['RateQuote']['PickupDate'])); 
+
         $post_data = json_encode(array("RateQuote" => $_POST['RateQuote']));
         $response = sidtechno_curl_post('/RateQuote', $post_data);
         if(isset($response['status'])) {
             if($response['status'] == 'success') {
                 $response = json_decode($response['response']);
-                $charge_detail = $response->RateQuote->ServiceLevels[0];
-                echo "<br><br><b>Name</b> ".$charge_detail->Name.'<br>';
-                echo "<b>Code</b> ".$charge_detail->Code.'<br>';
-                echo "<b>Quote</b> ".$charge_detail->QuoteNumber.'<br>';
-                echo "<b>Service Days</b> ".$charge_detail->ServiceDays.'<br>';
-                echo "<b>Charge</b> ".$charge_detail->Charge.'<br>';
-                echo "<b>Net Charge</b> ".$charge_detail->NetCharge.'<br>';
-                echo "<form action='' method='post'>
-                    <h2>Do you want to update with this order with this quote?
-                    <input type='hidden' name='hidden_quote_number' value='".$charge_detail->QuoteNumber."'>
-                    <button type='submit' class='btn btn-success' name='submit_update_rate_quote'>Submit</button>
-                </form>";
+
+                if(isset($response->Errors) AND count($response->Errors) > 0) {
+                    echo '<h3>Error</h3>';
+                    foreach ($response->Errors as $key => $value) {
+                        echo '<p>'.$value->ErrorMessage.'</p>';
+                    }
+                } else {
+                    $charge_detail = $response->RateQuote->ServiceLevels[0];
+                    echo "<br><br><b>Name</b> ".$charge_detail->Name.'<br>';
+                    echo "<b>Code</b> ".$charge_detail->Code.'<br>';
+                    echo "<b>Quote</b> ".$charge_detail->QuoteNumber.'<br>';
+                    echo "<b>Service Days</b> ".$charge_detail->ServiceDays.'<br>';
+                    echo "<b>Charge</b> ".$charge_detail->Charge.'<br>';
+                    echo "<b>Net Charge</b> ".$charge_detail->NetCharge.'<br>';
+                    echo "<form action='' method='post'>
+                        <h2>Do you want to update with this order with this quote?
+                        <input type='hidden' name='hidden_quote_number' value='".$charge_detail->QuoteNumber."'>
+                        <button type='submit' class='btn btn-success' name='submit_update_rate_quote'>Submit</button>
+                    </form>";
+                }
             }
         } else {
                 echo "<h4>Error!</h4>";
