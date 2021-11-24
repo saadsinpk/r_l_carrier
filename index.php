@@ -7,6 +7,11 @@ Author: Muhammad Saad
 Author URI: http://sidtechno.com
 */
 
+function isJson($string) {
+   json_decode($string);
+   return json_last_error() === JSON_ERROR_NONE;
+}
+
 // define the woocommerce_new_order callback 
 function sid_update_strip( $order_id ) { 
     // get order details data...
@@ -349,53 +354,55 @@ function sidtechno_update_tracking_order() {
         foreach ( $posts as $post ) {
             $check_today = get_post_meta($post->order_id, 'checked_today', true);
             $rl_ship_update = get_post_meta($post->order_id, 'rl_ship_update', true);
-
-            if($check_today == 0 AND $rl_ship_update != 1) {
-                $proID = get_post_meta($post->order_id, 'proID', true);
-                if(empty($proID)) {
-                    update_post_meta($post->order_id, 'checked_today', 1);
-                } else {
-                    $response_tracing = sidtechno_curl_get('/ShipmentTracing?request.traceNumbers='.$proID.'&request.traceType=PRO');
-                    if($response_tracing['status'] == 'error') {
+            $pickupID = get_post_meta($post->order_id, 'pickupID', true);
+            if(!empty($pickupID)) {
+                if($check_today == 0 AND $rl_ship_update != 1) {
+                    $proID = get_post_meta($post->order_id, 'proID', true);
+                    if(empty($proID)) {
                         update_post_meta($post->order_id, 'checked_today', 1);
                     } else {
-                        $resp = json_decode($response_tracing['response']);
-                        if(isset($resp->Shipments[0])) {
-                            $shipmment_number = $resp->Shipments[0]->ShipmentNumber;
-                            $shipmment_number = ltrim($shipmment_number, $shipmment_number[0]);
-                            $last_character = $shipmment_number[-1];
-                            $shipmment_number[-1] = '-';
-                            $shipmment_number = $shipmment_number.$last_character;
-
-                            $args     =  array(
-                                array(
-                                    'slug'              => 'rl-carriers',
-                                    'tracking_number'   => $shipmment_number,
-                                    'tracking_id' => md5( "{rl-carriers}-{".$shipmment_number."}" ),
-                                    'additional_fields' => array(
-                                        'account_number'      => '',
-                                        'key'                 => '',
-                                        'postal_code'         => '',
-                                        'ship_date'           => date("y-m-d"),
-                                        'destination_country' => '',
-                                        'state'               => '',
-                                    ),
-                                ),
-                            );
-                            update_post_meta($post->order_id, '_aftership_tracking_items', $args); // add and save the custom field
-                            update_post_meta($post->order_id, '_aftership_tracking_number', $shipmment_number); // add and save the custom field
-                            update_post_meta($post->order_id, '_aftership_tracking_provider_name', 'rl-carriers'); // add and save the custom field
+                        $response_tracing = sidtechno_curl_get('/ShipmentTracing?request.traceNumbers='.$proID.'&request.traceType=PRO');
+                        if($response_tracing['status'] == 'error') {
                             update_post_meta($post->order_id, 'checked_today', 1);
-                            update_post_meta($post->order_id, 'rl_ship_update', 1);
                         } else {
-                            update_post_meta($post->order_id, 'checked_today', 1);
+                            $resp = json_decode($response_tracing['response']);
+                            if(isset($resp->Shipments[0])) {
+                                $shipmment_number = $resp->Shipments[0]->ShipmentNumber;
+                                $shipmment_number = ltrim($shipmment_number, $shipmment_number[0]);
+                                $last_character = $shipmment_number[-1];
+                                $shipmment_number[-1] = '-';
+                                $shipmment_number = $shipmment_number.$last_character;
+
+                                $args     =  array(
+                                    array(
+                                        'slug'              => 'rl-carriers',
+                                        'tracking_number'   => $shipmment_number,
+                                        'tracking_id' => md5( "{rl-carriers}-{".$shipmment_number."}" ),
+                                        'additional_fields' => array(
+                                            'account_number'      => '',
+                                            'key'                 => '',
+                                            'postal_code'         => '',
+                                            'ship_date'           => date("y-m-d"),
+                                            'destination_country' => '',
+                                            'state'               => '',
+                                        ),
+                                    ),
+                                );
+                                update_post_meta($post->order_id, '_aftership_tracking_items', $args); // add and save the custom field
+                                update_post_meta($post->order_id, '_aftership_tracking_number', $shipmment_number); // add and save the custom field
+                                update_post_meta($post->order_id, '_aftership_tracking_provider_name', 'rl-carriers'); // add and save the custom field
+                                update_post_meta($post->order_id, 'checked_today', 1);
+                                update_post_meta($post->order_id, 'rl_ship_update', 1);
+                            } else {
+                                update_post_meta($post->order_id, 'checked_today', 1);
+                            }
                         }
+                        $count++;
                     }
-                    $count++;
-                }
-                if($count == 5) {
-                    break;
-                    exit();
+                    if($count == 5) {
+                        break;
+                        exit();
+                    }
                 }
             }
         }
@@ -582,7 +589,8 @@ function sidtechno_sales_manager(){
                 }
             }
 
-            $item_rate_quote[] = array('Height' => $item_height, 'Length' => $item_lenght, 'Width' => $item_width, 'Weight' => $item_weight,'Class' => $class);
+            // $item_rate_quote[] = array('Height' => $item_height, 'Length' => $item_lenght, 'Width' => $item_width, 'Weight' => $item_weight,'Class' => $class);
+            $item_rate_quote[] = array('Weight' => $item_weight,'Class' => $class);
             $total_pieces = calculate_pieces($item_quantity, get_post_meta($item_product,'_height', true));
             $item_bol[] = array('IsHazmat' => false, 'Pieces' => $total_pieces, 'NMFCItemNumber'=> '150390', 'NMFCSubNumber'=> '01', 'PackageType' => $package_Type,'Class' => 400, 'Weight' => ceil($item_weight), 'Description' => '('.$item_quantity.') '.$item_title );
             $pickup_req_total_weight = $pickup_req_total_weight + $item_lbs;
@@ -703,7 +711,8 @@ function sid_show_sales_man() {
                             }
                         }
 
-                        $item_rate_quote[] = array('Height' => $item_height, 'Length' => $item_lenght, 'Width' => $item_width, 'Weight' => $item_weight,'Class' => $class);
+                        // $item_rate_quote[] = array('Height' => $item_height, 'Length' => $item_lenght, 'Width' => $item_width, 'Weight' => $item_weight,'Class' => $class);
+                        $item_rate_quote[] = array('Weight' => $item_weight,'Class' => $class);
                         $total_pieces = calculate_pieces($item_quantity, get_post_meta($item_product,'_height', true));
                         $item_bol[] = array('IsHazmat' => false, 'Pieces' => $total_pieces, 'NMFCItemNumber'=> '150390', 'NMFCSubNumber'=> '01', 'PackageType' => $package_Type,'Class' => 400, 'Weight' => ceil($item_weight), 'Description' => '('.$item_quantity.') '.$item_title );
                         $pickup_req_total_weight = $pickup_req_total_weight + $item_lbs;
