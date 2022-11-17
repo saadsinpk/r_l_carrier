@@ -83,22 +83,23 @@ function sid_woocommerce_checkout_update_order_meta($order_id) {
     $order = new WC_Order( $order_id );
     // if($order->get_shipping_method() == 'PHS Inc. Standard Delivery Service - 3 day(s)') {
         $order_detail = $order->get_data();
-        $shipment = new RLC_Shipment();
+        // $shipment = new RLC_Shipment();
 
-        $shipments = $shipment->getOrderShipments($order_id);
+        // $shipments = $shipment->getOrderShipments($order_id);
 
-        if ( !sizeof( $shipments) ){
-            foreach( $order->get_items( 'shipping' ) as $item_id => $shipping_item_obj ){
-                $quoteNumber = $shipping_item_obj->get_meta('quote');
-            }
-        } else{
-            foreach ( $shipments as $shipment ) {
-                foreach ( $shipment->getQuotes() as $quote ) {
-                    $quoteNumber = $quote->quote_number;
-                }
+        // if ( !sizeof( $shipments) ){
+        //     foreach( $order->get_items( 'shipping' ) as $item_id => $shipping_item_obj ){
+        //         $quoteNumber = $shipping_item_obj->get_meta('quote');
+        //     }
+        // } else{
+        //     foreach ( $shipments as $shipment ) {
+        //         foreach ( $shipment->getQuotes() as $quote ) {
+        //             $quoteNumber = $quote->quote_number;
+        //         }
 
-            }
-        }
+        //     }
+        // }
+        $quoteNumber = '';
 
         $client = new SoapClient("http://api.rlcarriers.com/1.0.3/BillOfLadingService.asmx?WSDL", array("trace" => 1));
         $codes = json_decode(file_get_contents('http://country.io/iso3.json'), true);
